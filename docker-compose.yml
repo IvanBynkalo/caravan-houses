@@ -1,0 +1,58 @@
+version: '3.9'
+
+services:
+
+  # ── Backend ────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: caravan-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV:           production
+      PORT:               3000
+      HOST:               0.0.0.0
+      DATABASE_PATH:      /app/data/caravan.db
+      JWT_SECRET:         ${JWT_SECRET:?JWT_SECRET is required}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
+    volumes:
+      - db_data:/app/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout:  5s
+      retries:  3
+      start_period: 15s
+
+  # ── Frontend ───────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_URL: /api
+        VITE_WS_URL:  ""   # пустая строка = автоопределение из window.location
+    container_name: caravan-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+    volumes:
+      # Для Let's Encrypt (опционально)
+      - ./certs:/etc/nginx/certs:ro
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  internal:
+    driver: bridge

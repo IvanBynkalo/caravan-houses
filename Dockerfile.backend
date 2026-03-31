@@ -1,0 +1,54 @@
+# ── Stage 1: build ──────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Копируем манифесты для кэширования слоёв
+COPY package.json ./
+COPY shared/package.json ./shared/
+COPY packages/backend/package.json ./packages/backend/
+
+# Устанавливаем зависимости
+RUN npm install --workspace=shared --workspace=packages/backend
+
+# Копируем исходники
+COPY shared/ ./shared/
+COPY packages/backend/ ./packages/backend/
+
+# Компилируем TypeScript
+WORKDIR /app/packages/backend
+RUN npx tsc --project tsconfig.json
+
+# ── Stage 2: runtime ────────────────────────
+FROM node:20-alpine AS runtime
+
+# Устанавливаем зависимости для better-sqlite3
+RUN apk add --no-cache python3 make g++ sqlite
+
+WORKDIR /app
+
+# Только production зависимости
+COPY package.json ./
+COPY shared/package.json ./shared/
+COPY packages/backend/package.json ./packages/backend/
+RUN npm install --workspace=shared --workspace=packages/backend --omit=dev
+
+# Скомпилированный код
+COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
+COPY --from=builder /app/shared/src            ./shared/src
+
+# Игровые данные
+COPY packages/backend/src/data ./packages/backend/dist/data
+
+# Директория для БД
+RUN mkdir -p /app/data && chown -R node:node /app/data
+VOLUME ["/app/data"]
+
+USER node
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+  CMD wget -qO- http://localhost:3000/health || exit 1
+
+CMD ["node", "packages/backend/dist/server.js"]

@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target":           "ES2022",
+    "module":           "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir":           "./dist",
+    "strict":           true,
+    "esModuleInterop":  true,
+    "skipLibCheck":     true,
+    "resolveJsonModule": false,
+    "paths": {
+      "@caravan/shared": ["../../shared/src/index.ts"]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "../../shared/src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/__tests__"
+  ]
+}

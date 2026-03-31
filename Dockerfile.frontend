@@ -1,0 +1,68 @@
+# ── Stage 1: build ──────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package.json ./
+COPY shared/package.json ./shared/
+COPY packages/frontend/package.json ./packages/frontend/
+RUN npm install --workspace=shared --workspace=packages/frontend
+
+COPY shared/   ./shared/
+COPY packages/frontend/ ./packages/frontend/
+# Данные карты нужны фронтенду через относительный импорт
+COPY packages/backend/src/data ./packages/backend/src/data
+
+ARG VITE_API_URL=/api
+ARG VITE_WS_URL
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+
+WORKDIR /app/packages/frontend
+RUN npx vite build
+
+# ── Stage 2: nginx ───────────────────────────
+FROM nginx:alpine AS runtime
+
+# Конфиг nginx с проксированием на backend
+COPY --from=builder /app/packages/frontend/dist /usr/share/nginx/html
+
+COPY <<'EOF' /etc/nginx/conf.d/default.conf
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy API к backend
+    location /api/ {
+        proxy_pass         http://backend:3000/;
+        proxy_http_version 1.1;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+    }
+
+    # Proxy WebSocket
+    location /ws/ {
+        proxy_pass         http://backend:3000/ws/;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host $host;
+        proxy_read_timeout 86400;
+    }
+
+    gzip on;
+    gzip_types text/css application/javascript application/json;
+}
+EOF
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s \
+  CMD wget -qO- http://localhost/ || exit 1

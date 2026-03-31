@@ -1,0 +1,15 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = [
+  "cd packages/backend && npx tsc --project tsconfig.json",
+  "mkdir -p packages/backend/dist/src/data/maps",
+  "cp -r packages/backend/src/data packages/backend/dist/src/data"
+]
+
+[start]
+cmd = "node packages/backend/dist/src/server.js"

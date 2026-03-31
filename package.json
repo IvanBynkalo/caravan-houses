@@ -1,0 +1,15 @@
+{
+  "name": "caravan-houses",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "shared"
+  ],
+  "scripts": {
+    "dev:backend":  "npm run dev --workspace=packages/backend",
+    "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "build":        "npm run build --workspaces",
+    "test":         "npm run test --workspaces"
+  }
+}

@@ -1,0 +1,38 @@
+version: '3.9'
+
+# Запуск: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: builder          # остаёмся на build-стадии для dev
+    environment:
+      NODE_ENV:           development
+      PORT:               3000
+      DATABASE_PATH:      /app/data/caravan.db
+      JWT_SECRET:         dev-secret-local
+      TELEGRAM_BOT_TOKEN: ""
+    volumes:
+      - ./packages/backend/src:/app/packages/backend/src:ro
+      - ./shared/src:/app/shared/src:ro
+      - db_data:/app/data
+    ports:
+      - "3000:3000"
+    command: ["npx", "tsx", "watch", "packages/backend/src/server.ts"]
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    environment:
+      VITE_API_URL: http://localhost:3000
+      VITE_WS_URL:  ws://localhost:3000/ws
+    volumes:
+      - .:/app
+    ports:
+      - "5173:5173"
+    command: ["npm", "run", "dev:frontend"]
+    depends_on:
+      - backend
